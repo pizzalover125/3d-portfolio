@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Aaradhya Panda - WebXR Portfolio</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <style>
+      body {
+        background-color: #000;
+        color: #fff;
+        font-family:
+          "Inter",
+          -apple-system,
+          system-ui,
+          sans-serif;
+        margin: 0;
+        overflow: hidden;
+      }
+    </style>
+    <script>
+      AFRAME.registerGeometry("rounded-box", {
+        schema: {
+          width: { default: 1 },
+          height: { default: 1 },
+          depth: { default: 1 },
+          radius: { default: 0.15 },
+        },
+        init: function (data) {
+          var shape = new THREE.Shape();
+          var w = data.width,
+            h = data.height,
+            r = data.radius;
+          shape.moveTo(-w / 2, -h / 2 + r);
+          shape.lineTo(-w / 2, h / 2 - r);
+          shape.quadraticCurveTo(-w / 2, h / 2, -w / 2 + r, h / 2);
+          shape.lineTo(w / 2 - r, h / 2);
+          shape.quadraticCurveTo(w / 2, h / 2, w / 2, h / 2 - r);
+          shape.lineTo(w / 2, -h / 2 + r);
+          shape.quadraticCurveTo(w / 2, -h / 2, w / 2 - r, -h / 2);
+          shape.lineTo(-w / 2 + r, -h / 2);
+          shape.quadraticCurveTo(-w / 2, -h / 2, -w / 2, -h / 2 + r);
+
+          var extrudeSettings = {
+            depth: data.depth,
+            bevelEnabled: false,
+          };
+
+          var geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+          geometry.translate(0, 0, -data.depth / 2);
+          this.geometry = geometry;
+        },
+      });
+
+      AFRAME.registerComponent("navigate-on-click", {
+        schema: { url: { default: "" } },
+        init: function () {
+          var data = this.data;
+          var el = this.el;
+
+          el.addEventListener("click", function () {
+            window.open(data.url, "_blank");
+          });
+
+          el.addEventListener("mouseenter", function () {
+            el.setAttribute("material", "color", "#222222");
+            el.sceneEl.canvas.style.cursor = "pointer";
+          });
+
+          el.addEventListener("mouseleave", function () {
+            el.setAttribute("material", "color", "#111111");
+            el.sceneEl.canvas.style.cursor = "";
+          });
+        },
+      });
+    </script>
+    <script>
+      // Custom grainy gradient shader for the background
+      AFRAME.registerShader("grainy-gradient", {
+        schema: {
+          bgColor: { type: "color", is: "uniform", default: "#050504" },
+          glowColor: { type: "color", is: "uniform", default: "#faf6ee" },
+        },
+        vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+        fragmentShader: `
+        varying vec2 vUv;
+        uniform vec3 bgColor;
+        uniform vec3 glowColor;
+
+        float random(vec2 st) {
+            return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+        }
+
+        // Value noise
+        float noise(vec2 st) {
+            vec2 i = floor(st);
+            vec2 f = fract(st);
+
+            float a = random(i);
+            float b = random(i + vec2(1.0, 0.0));
+            float c = random(i + vec2(0.0, 1.0));
+            float d = random(i + vec2(1.0, 1.0));
+
+            vec2 u = f*f*(3.0-2.0*f);
+
+            return mix(a, b, u.x) +
+                    (c - a)* u.y * (1.0 - u.x) +
+                    (d - b) * u.x * u.y;
+        }
+
+        float fbm(vec2 st) {
+            float value = 0.0;
+            float amplitude = .5;
+            for (int i = 0; i < 4; i++) {
+                value += amplitude * noise(st);
+                st *= 2.;
+                amplitude *= .5;
+            }
+            return value;
+        }
+
+        void main() {
+          vec3 color = bgColor;
+          vec2 center = vec2(0.8, 0.8);
+          float dist = distance(vUv, center);
+          float glow = smoothstep(0.5, 0.0, dist) * 0.15;
+          color = mix(color, glowColor, glow);
+
+          float g = fbm(vUv * 800.0);
+          color += vec3(g) * 0.07;
+          
+          float speckles = random(vUv * 2500.0);
+          color += vec3(speckles) * 0.06;
+
+          gl_FragColor = vec4(color, 1.0);
+        }
+      `,
+      });
+    </script>
+  </head>
+  <body>
+    <a-scene
+      background="color: #000000"
+      raycaster="objects: .clickable"
+      cursor="rayOrigin: mouse"
+    >
+      <a-sky
+        material="shader: grainy-gradient; bgColor: #050504; glowColor: #faf6ee"
+      ></a-sky>
+      <a-entity position="0 1.6 0">
+        <a-camera look-controls="pointerLockEnabled: false">
+          <a-entity
+            cursor="fuse: false;"
+            position="0 0 -1"
+            geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.015"
+            material="color: #FFFFFF; shader: flat; opacity: 0.8"
+            raycaster="objects: .clickable"
+            animation__click="property: scale; startEvents: click; easing: easeInCubic; dur: 150; from: 0.1 0.1 0.1; to: 1 1 1"
+          >
+          </a-entity>
+        </a-camera>
+      </a-entity>
+
+      <a-entity position="0 1.6 -3">
+        <a-entity
+          position="0 0.15 -0.11"
+          geometry="primitive: rounded-box; width: 5.5; height: 1.5; depth: 0.2; radius: 0.15"
+          material="color: #ffffff; opacity: 0.35; transparent: true; roughness: 0.6; metalness: 0.2"
+        ></a-entity>
+        <a-text
+          value="Aaradhya Panda"
+          font="roboto"
+          align="left"
+          position="-2.4 0.5 0"
+          scale="2.5 2.5 2.5"
+          color="#FFFFFF"
+        >
+        </a-text>
+        <a-text
+          side="back"
+          value="Aaradhya Panda"
+          font="roboto"
+          align="left"
+          position="-2.4 0.5 -0.22"
+          scale="2.5 2.5 2.5"
+          color="#FFFFFF"
+        >
+        </a-text>
+
+        <a-text
+          value="i craft experiences: software, hardware, and events"
+          font="roboto"
+          align="left"
+          position="-2.4 -0.2 0"
+          color="#CCCCCC"
+          width="5"
+        >
+        </a-text>
+        <a-text
+          side="back"
+          value="i craft experiences: software, hardware, and events"
+          font="roboto"
+          align="left"
+          position="-2.4 -0.2 -0.22"
+          color="#CCCCCC"
+          width="5"
+        >
+        </a-text>
+      </a-entity>
+
+      <a-entity position="3.5 1.6 0" rotation="0 -90 0">
+        <!-- Background Box -->
+        <a-entity
+          position="0.4 0.4 -0.11"
+          geometry="primitive: rounded-box; width: 7.5; height: 3; depth: 0.2; radius: 0.15"
+          material="color: #ffffff; opacity: 0.35; transparent: true; roughness: 0.6; metalness: 0.2"
+        ></a-entity>
+        <a-text
+          value="Projects"
+          font="roboto"
+          align="left"
+          position="-2.5 1.5 0"
+          scale="1.5 1.5 1.5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="Projects"
+          font="roboto"
+          align="left"
+          position="-2.5 1.5 -0.22"
+          scale="1.5 1.5 1.5"
+          color="#888888"
+        ></a-text>
+
+        <a-text
+          value="hack club app"
+          font="roboto"
+          position="-2.5 0.8 0"
+          width="5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          side="back"
+          value="hack club app"
+          font="roboto"
+          position="-2.5 0.8 -0.22"
+          width="5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          value="the single platform for all things hack club"
+          font="roboto"
+          position="-0.9 0.8 0"
+          width="5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="the single platform for all things hack club"
+          font="roboto"
+          position="-0.9 0.8 -0.22"
+          width="5"
+          color="#888888"
+        ></a-text>
+
+        <a-text
+          value="notes"
+          font="roboto"
+          position="-2.5 0.3 0"
+          width="5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          side="back"
+          value="notes"
+          font="roboto"
+          position="-2.5 0.3 -0.22"
+          width="5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          value="ai-powered learning platform"
+          font="roboto"
+          position="-1.7 0.3 0"
+          width="5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="ai-powered learning platform"
+          font="roboto"
+          position="-1.7 0.3 -0.22"
+          width="5"
+          color="#888888"
+        ></a-text>
+
+        <a-text
+          value="cognified"
+          font="roboto"
+          position="-2.5 -0.2 0"
+          width="5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          side="back"
+          value="cognified"
+          font="roboto"
+          position="-2.5 -0.2 -0.22"
+          width="5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          value="platform for seniors to stay fit"
+          font="roboto"
+          position="-1.3 -0.2 0"
+          width="5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="platform for seniors to stay fit"
+          font="roboto"
+          position="-1.3 -0.2 -0.22"
+          width="5"
+          color="#888888"
+        ></a-text>
+
+        <a-text
+          value="stenO"
+          font="roboto"
+          position="-2.5 -0.7 0"
+          width="5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          side="back"
+          value="stenO"
+          font="roboto"
+          position="-2.5 -0.7 -0.22"
+          width="5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          value="open source stenography keyboard to type 250+ wpm"
+          font="roboto"
+          position="-1.6 -0.7 0"
+          width="5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="open source stenography keyboard to type 250+ wpm"
+          font="roboto"
+          position="-1.6 -0.7 -0.22"
+          width="5"
+          color="#888888"
+        ></a-text>
+      </a-entity>
+
+      <a-entity position="-3.5 1.6 0" rotation="0 90 0">
+        <a-entity
+          position="0 0.5 -0.11"
+          geometry="primitive: rounded-box; width: 5.8; height: 3.6; depth: 0.2; radius: 0.15"
+          material="color: #ffffff; opacity: 0.35; transparent: true; roughness: 0.6; metalness: 0.2"
+        ></a-entity>
+        <a-text
+          value="Experience"
+          font="roboto"
+          align="left"
+          position="-2.5 2.0 0"
+          scale="1.5 1.5 1.5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="Experience"
+          font="roboto"
+          align="left"
+          position="-2.5 2.0 -0.22"
+          scale="1.5 1.5 1.5"
+          color="#888888"
+        ></a-text>
+
+        <a-text
+          value="chess player"
+          font="roboto"
+          position="-2.5 1.4 0"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          side="back"
+          value="chess player"
+          font="roboto"
+          position="-2.5 1.4 -0.22"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          value="jul 2016 - present"
+          font="roboto"
+          align="right"
+          position="2.5 1.4 0"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="jul 2016 - present"
+          font="roboto"
+          align="right"
+          position="2.5 1.4 -0.22"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+
+        <a-text
+          value="violinist"
+          font="roboto"
+          position="-2.5 1.1 0"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          side="back"
+          value="violinist"
+          font="roboto"
+          position="-2.5 1.1 -0.22"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          value="dec 2020 - present"
+          font="roboto"
+          align="right"
+          position="2.5 1.1 0"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="dec 2020 - present"
+          font="roboto"
+          align="right"
+          position="2.5 1.1 -0.22"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+
+        <a-text
+          value="teen volunteer @cyberseniors"
+          font="roboto"
+          position="-2.5 0.8 0"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          side="back"
+          value="teen volunteer @cyberseniors"
+          font="roboto"
+          position="-2.5 0.8 -0.22"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          value="dec 2022 - present"
+          font="roboto"
+          align="right"
+          position="2.5 0.8 0"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="dec 2022 - present"
+          font="roboto"
+          align="right"
+          position="2.5 0.8 -0.22"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+
+        <a-text
+          value="maker"
+          font="roboto"
+          position="-2.5 0.5 0"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          side="back"
+          value="maker"
+          font="roboto"
+          position="-2.5 0.5 -0.22"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          value="dec 2022 - present"
+          font="roboto"
+          align="right"
+          position="2.5 0.5 0"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="dec 2022 - present"
+          font="roboto"
+          align="right"
+          position="2.5 0.5 -0.22"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+
+        <a-text
+          value="hackathon organizer @hackclub"
+          font="roboto"
+          position="-2.5 0.2 0"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          side="back"
+          value="hackathon organizer @hackclub"
+          font="roboto"
+          position="-2.5 0.2 -0.22"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          value="aug 2024 - feb 2025"
+          font="roboto"
+          align="right"
+          position="2.5 0.2 0"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="aug 2024 - feb 2025"
+          font="roboto"
+          align="right"
+          position="2.5 0.2 -0.22"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+
+        <a-text
+          value="debater"
+          font="roboto"
+          position="-2.5 -0.1 0"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          side="back"
+          value="debater"
+          font="roboto"
+          position="-2.5 -0.1 -0.22"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          value="sep 2024 - present"
+          font="roboto"
+          align="right"
+          position="2.5 -0.1 0"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="sep 2024 - present"
+          font="roboto"
+          align="right"
+          position="2.5 -0.1 -0.22"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+
+        <a-text
+          value="ambassador @CAC"
+          font="roboto"
+          position="-2.5 -0.4 0"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          side="back"
+          value="ambassador @CAC"
+          font="roboto"
+          position="-2.5 -0.4 -0.22"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          value="aug 2025 - nov 2025"
+          font="roboto"
+          align="right"
+          position="2.5 -0.4 0"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="aug 2025 - nov 2025"
+          font="roboto"
+          align="right"
+          position="2.5 -0.4 -0.22"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+
+        <a-text
+          value="founder @the code hatch"
+          font="roboto"
+          position="-2.5 -0.7 0"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          side="back"
+          value="founder @the code hatch"
+          font="roboto"
+          position="-2.5 -0.7 -0.22"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          value="sep 2025 - present"
+          font="roboto"
+          align="right"
+          position="2.5 -0.7 0"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="sep 2025 - present"
+          font="roboto"
+          align="right"
+          position="2.5 -0.7 -0.22"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+
+        <a-text
+          value="ambassador @stardance"
+          font="roboto"
+          position="-2.5 -1.0 0"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          side="back"
+          value="ambassador @stardance"
+          font="roboto"
+          position="-2.5 -1.0 -0.22"
+          width="4.5"
+          color="#FFFFFF"
+        ></a-text>
+        <a-text
+          value="may 2026 - present"
+          font="roboto"
+          align="right"
+          position="2.5 -1.0 0"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="may 2026 - present"
+          font="roboto"
+          align="right"
+          position="2.5 -1.0 -0.22"
+          width="4.5"
+          color="#888888"
+        ></a-text>
+      </a-entity>
+
+      <a-entity position="0 1.6 3.5" rotation="0 180 0">
+        <a-entity
+          position="0 0.25 -0.11"
+          geometry="primitive: rounded-box; width: 4.5; height: 2; depth: 0.2; radius: 0.15"
+          material="color: #ffffff; opacity: 0.35; transparent: true; roughness: 0.6; metalness: 0.2"
+        ></a-entity>
+        <a-text
+          value="Connect"
+          font="roboto"
+          align="left"
+          position="-1.5 1.0 0"
+          scale="1.5 1.5 1.5"
+          color="#888888"
+        ></a-text>
+        <a-text
+          side="back"
+          value="Connect"
+          font="roboto"
+          align="left"
+          position="-1.5 1.0 -0.22"
+          scale="1.5 1.5 1.5"
+          color="#888888"
+        ></a-text>
+        <a-entity
+          position="-1 0.4 0"
+          class="clickable"
+          navigate-on-click="url: mailto:adi@apanda.dev"
+          geometry="primitive: plane; width: 1.0; height: 0.4"
+          material="color: #111111; opacity: 0.6; transparent: true"
+        >
+          <a-text
+            value="email"
+            align="center"
+            position="0 0 0.02"
+            font="roboto"
+            color="#FFFFFF"
+          ></a-text>
+          <a-text
+            side="back"
+            value="email"
+            align="center"
+            position="0 0 -0.08"
+            font="roboto"
+            color="#FFFFFF"
+          ></a-text>
+        </a-entity>
+
+        <a-entity
+          position="0.2 0.4 0"
+          class="clickable"
+          navigate-on-click="url: https://github.com/pizzalover125"
+          geometry="primitive: plane; width: 1.0; height: 0.4"
+          material="color: #111111; opacity: 0.6; transparent: true"
+        >
+          <a-text
+            value="github"
+            align="center"
+            position="0 0 0.02"
+            font="roboto"
+            color="#FFFFFF"
+          ></a-text>
+          <a-text
+            side="back"
+            value="github"
+            align="center"
+            position="0 0 -0.08"
+            font="roboto"
+            color="#FFFFFF"
+          ></a-text>
+        </a-entity>
+
+        <a-entity
+          position="1.4 0.4 0"
+          class="clickable"
+          navigate-on-click="url: https://www.linkedin.com/in/aaradhya-panda-285915366/"
+          geometry="primitive: plane; width: 1.0; height: 0.4"
+          material="color: #111111; opacity: 0.6; transparent: true"
+        >
+          <a-text
+            value="linkedin"
+            align="center"
+            position="0 0 0.02"
+            font="roboto"
+            color="#FFFFFF"
+          ></a-text>
+          <a-text
+            side="back"
+            value="linkedin"
+            align="center"
+            position="0 0 -0.08"
+            font="roboto"
+            color="#FFFFFF"
+          ></a-text>
+        </a-entity>
+
+        <a-text
+          value="crafted by adi.  last updated may 2026"
+          font="roboto"
+          align="center"
+          position="0 -0.5 0"
+          width="3"
+          color="#666666"
+        ></a-text>
+        <a-text
+          side="back"
+          value="crafted by adi.  last updated may 2026"
+          font="roboto"
+          align="center"
+          position="0 -0.5 -0.22"
+          width="3"
+          color="#666666"
+        ></a-text>
+      </a-entity>
+    </a-scene>
+  </body>
+</html>
