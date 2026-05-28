@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Aaradhya Panda - WebXR Portfolio</title>
+    <title>Aaradhya Panda</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <style>
@@ -75,7 +75,6 @@
       });
     </script>
     <script>
-      // Custom grainy gradient shader for the background
       AFRAME.registerShader("grainy-gradient", {
         schema: {
           bgColor: { type: "color", is: "uniform", default: "#050504" },
@@ -215,7 +214,6 @@
       </a-entity>
 
       <a-entity position="3.5 1.6 0" rotation="0 -90 0">
-        <!-- Background Box -->
         <a-entity
           position="0.4 0.4 -0.11"
           geometry="primitive: rounded-box; width: 7.5; height: 3; depth: 0.2; radius: 0.15"
